@@ -7,8 +7,21 @@ import pandas as pd
 
 def optimize(trial, train_data):
     """
-    Función objetivo para Optuna que maximiza el ratio de Calmar.
+    Función objetivo para Optuna que maximiza el ratio de Calmar con cross-validation para evitar overfitting.
+
+    Parameters:
+    trial : optuna.trial.Trial
+        Objeto trial de Optuna que sugiere los parámetros a optimizar
+    train_data : pandas.DataFrame
+        DataFrame con datos de precios históricos para entrenamiento.
+        Debe contener al menos las columnas: 'Open', 'High', 'Low', 'Close', 'Volume'
+
+    Returns:
+    float
+        Promedio del ratio de Calmar obtenido en validación cruzada temporal.
+        Retorna -np.inf si no hubo operaciones válidas en ningún chunk.
     """
+    
     data = train_data.copy()
     
     # --- 1. Definir los parámetros que Optuna optimizará ---
@@ -61,6 +74,16 @@ def optimize(trial, train_data):
     return np.mean(calmars)
 
 def run_optuna(train_data: pd.DataFrame, n_trials: int = 70):
+    """
+    Args:
+        train_data (pd.DataFrame): DataFrame con datos de entrenamiento.
+        n_trials (int, optional): Defaults to 70.
+
+    Returns:
+        optuna.Study: Estudio de Optuna con los mejores parámetros encontrados.
+        Maximiza el ratio de Calmar con la función objetivo definida optimize.
+    """
+
     study = optuna.create_study(direction="maximize", study_name="crypto_calmar_opt")
     study.optimize(lambda trial: optimize(trial, train_data), n_trials=n_trials)
 
