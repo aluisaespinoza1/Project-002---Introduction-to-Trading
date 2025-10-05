@@ -3,6 +3,9 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from signals import get_signals
+from backtest import backtest
+from metrics import get_sharpe_ratio, get_sortino_ratio, get_max_drawdown, get_win_rate, get_calmar
 
 
 

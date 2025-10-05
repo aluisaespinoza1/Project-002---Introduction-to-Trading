@@ -3,6 +3,7 @@ from signals import get_signals
 from metrics import get_calmar
 import numpy as np
 import optuna
+import pandas as pd
 
 def optimize(trial, train_data):
     """
