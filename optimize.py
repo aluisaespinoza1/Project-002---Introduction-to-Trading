@@ -28,12 +28,12 @@ def optimize(trial, train_data):
     params = {
         # RSI - rangos más estándar
         "rsi_window": trial.suggest_int("rsi_window", 10, 21),  # Más corto, más reactivo
-        "rsi_buy": trial.suggest_int("rsi_buy", 25, 35),  # Zona de sobreventa clásica
-        "rsi_sell": trial.suggest_int("rsi_sell", 65, 75),  # Zona de sobrecompra clásica
+        "rsi_buy": trial.suggest_int("rsi_buy", 15, 25),  # Zona de sobreventa clásica
+        "rsi_sell": trial.suggest_int("rsi_sell", 75, 85),  # Zona de sobrecompra clásica
         
         # MACD - rangos estándar de la industria
         "macd_fast": trial.suggest_int("macd_fast", 8, 15),
-        "macd_slow": trial.suggest_int("macd_slow", 20, 30),
+        "macd_slow": trial.suggest_int("macd_slow", 20, 26),
         "macd_signal": trial.suggest_int("macd_signal", 5, 12),
         
         # Stochastic - ventanas más cortas para crypto
