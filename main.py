@@ -6,11 +6,11 @@ from utils import split_data, plot_portfolio_subplots, plot_portfolio_history, e
 
 def main():
     # 1️⃣ Dividir datos
-
-    train_df, test_df, val_df = split_data(df=pd.read_csv("data/BTC-USD-hourly.csv"))
+    df = pd.read_csv('data.csv')
+    train_df, test_df, val_df = split_data(df)
 
     # 2️⃣ Estudio Optuna
-    study = run_optuna(train_data=train_df, n_trials=55)
+    study = run_optuna(train_data=train_df, n_trials=50)
 
     print("\n✅ Mejor trial:")
     print(f"Score (Calmar): {study.best_value:.4f}")
@@ -42,7 +42,7 @@ def main():
 
     f = ['Monthly', 'Quarterly', 'Yearly']
     for i in f:
-        fig4 = plot_metrics_summary_table(metrics_dict, freq=i)
+        fig4 = plot_metrics_summary_table(metrics_dict, frequency=i)
         fig4.show()
 
 if __name__ == "__main__":
