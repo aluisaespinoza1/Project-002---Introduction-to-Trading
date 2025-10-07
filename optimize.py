@@ -21,36 +21,36 @@ def optimize(trial, train_data):
         Promedio del ratio de Calmar obtenido en validación cruzada temporal.
         Retorna -np.inf si no hubo operaciones válidas en ningún chunk.
     """
-    
+
     data = train_data.copy()
     
     # --- 1. Definir los parámetros que Optuna optimizará ---
     params = {
-        # RSI
-        "rsi_window": trial.suggest_int("rsi_window",7, 30),
-        "rsi_buy": trial.suggest_int("rsi_buy", 20, 40),
-        "rsi_sell": trial.suggest_int("rsi_sell", 70, 90),
-
-        # MACD
-        "macd_fast": trial.suggest_int("macd_fast", 6, 20),
-        "macd_slow": trial.suggest_int("macd_slow", 20, 40),
-        "macd_signal": trial.suggest_int("macd_signal", 5, 15),
-
-        # Stochastic
-        "stoch_window": trial.suggest_int("stoch_window", 10, 48),
-        "smooth_window": trial.suggest_int("smooth_window", 3, 15),
-
-        # Backtest
-        "stop_loss": trial.suggest_float("stop_loss", 0.1, 0.5),
-        "take_profit": trial.suggest_float("take_profit", 0.1, 0.3),
-        "n_shares": trial.suggest_float("n_shares", 0.1, 25),
+        # RSI - rangos más estándar
+        "rsi_window": trial.suggest_int("rsi_window", 10, 21),  # Más corto, más reactivo
+        "rsi_buy": trial.suggest_int("rsi_buy", 25, 35),  # Zona de sobreventa clásica
+        "rsi_sell": trial.suggest_int("rsi_sell", 65, 75),  # Zona de sobrecompra clásica
+        
+        # MACD - rangos estándar de la industria
+        "macd_fast": trial.suggest_int("macd_fast", 8, 15),
+        "macd_slow": trial.suggest_int("macd_slow", 20, 30),
+        "macd_signal": trial.suggest_int("macd_signal", 7, 12),
+        
+        # Stochastic - ventanas más cortas para crypto
+        "stoch_window": trial.suggest_int("stoch_window", 10, 21),
+        "smooth_window": trial.suggest_int("smooth_window", 3, 7),
+        
+        # Backtest - CRÍTICO para minimizar pérdidas
+        "stop_loss": trial.suggest_float("stop_loss", 0.02, 0.08),  # 2-8% SL más apretado
+        "take_profit": trial.suggest_float("take_profit", 0.03, 0.12),  # 3-12% TP proporcional
+        "n_shares": trial.suggest_float("n_shares", 0.05, 1.5),  # Posiciones más pequeñas
     }
 
     # --- 2. Calcular señales con los parámetros sugeridos ---
     signals_df, _ = get_signals(data, **params)
 
     # --- 3. Validación cruzada temporal (n_splits chunks) ---
-    n_splits = 6
+    n_splits = 5
     len_data = len(signals_df)
     size = len_data // n_splits
     calmars = []
@@ -73,7 +73,7 @@ def optimize(trial, train_data):
         return -np.inf  # si no hubo operaciones válidas
     return np.mean(calmars)
 
-def run_optuna(train_data: pd.DataFrame, n_trials: int = 70):
+def run_optuna(train_data: pd.DataFrame, n_trials: int = 50):
     """
     Args:
         train_data (pd.DataFrame): DataFrame con datos de entrenamiento.
