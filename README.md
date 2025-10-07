@@ -3,14 +3,13 @@
 
 
 To run the code first:
+
  1.  Create virtual environment
 python -m venv venv
 
- 2. Activate venv for MacOs
-source venv/bin/activate
-
- 2.1 for Windows
- venv\Scripts\activate
+ 2. Activate venv  
+ - MacOs: source venv/bin/activate
+ - Windows: venv\Scripts\activate
 
  3. Install Requirements
  pip install -r requirements.txt
