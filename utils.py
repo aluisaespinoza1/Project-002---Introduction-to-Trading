@@ -437,72 +437,60 @@ def calculate_returns_summary(train_df, test_df, val_df, full_df):
     """
     
     def calculate_returns(df):
-        """Función auxiliar para calcular rendimientos anualizados por periodo"""
         df = df.copy()
-        
-        # Asegurar que Date es datetime
         if not pd.api.types.is_datetime64_any_dtype(df['Date']):
             df['Date'] = pd.to_datetime(df['Date'])
-        
         df = df.sort_values('Date').reset_index(drop=True)
         df_indexed = df.set_index('Date')
-        
-        # Calcular duración total del periodo en años
+
+        # Duración total del periodo en años
         tiempo_total = df['Date'].iloc[-1] - df['Date'].iloc[0]
         años_totales = tiempo_total.total_seconds() / (365.25 * 24 * 3600)
-        
-        # Método 1: Rendimiento compuesto anualizado (CAGR) - Más preciso
+
         valor_inicial = df['portfolio_value'].iloc[0]
         valor_final = df['portfolio_value'].iloc[-1]
-        
+
+        # CAGR general (rendimiento anualizado total)
         if años_totales > 0 and valor_inicial > 0:
             cagr = (valor_final / valor_inicial) ** (1 / años_totales) - 1
         else:
             cagr = 0
-        
-        # Método 2: Rendimientos promedio por periodo (con anualización)
-        # MENSUAL: resample a fin de mes, calcular retornos, anualizar
-        monthly_returns = df_indexed['portfolio_value'].resample('M').last().pct_change().dropna()
+
+        # Rendimiento mensual compuesto
+        monthly_prices = df_indexed['portfolio_value'].resample('M').last()
+        monthly_returns = monthly_prices.pct_change().dropna()
         if len(monthly_returns) >= 2:
-            # Promedio geométrico anualizado
-            monthly_avg = ((1 + monthly_returns.mean()) ** 12 - 1)
+            n_months = len(monthly_returns)
+            monthly_comp = (1 + monthly_returns).prod() ** (12 / n_months) - 1
         else:
-            monthly_avg = cagr  # Fallback al CAGR si no hay suficientes datos
-        
-        # TRIMESTRAL: resample a fin de trimestre, calcular retornos, anualizar
-        quarterly_returns = df_indexed['portfolio_value'].resample('Q').last().pct_change().dropna()
+            monthly_comp = cagr
+
+        # Rendimiento trimestral compuesto
+        quarterly_prices = df_indexed['portfolio_value'].resample('Q').last()
+        quarterly_returns = quarterly_prices.pct_change().dropna()
         if len(quarterly_returns) >= 2:
-            quarterly_avg = ((1 + quarterly_returns.mean()) ** 4 - 1)
+            n_quarters = len(quarterly_returns)
+            quarterly_comp = (1 + quarterly_returns).prod() ** (4 / n_quarters) - 1
         else:
-            quarterly_avg = cagr
-        
-        # ANUAL: usar directamente el CAGR calculado
-        yearly_avg = cagr
-        
-        # Convertir a porcentaje
-        return monthly_avg * 100, quarterly_avg * 100, yearly_avg * 100
-    
-    # Calcular para cada dataframe
+            quarterly_comp = cagr
+
+        yearly_comp = cagr
+
+        return monthly_comp * 100, quarterly_comp * 100, yearly_comp * 100
+
     results = {
         'Train': calculate_returns(train_df),
         'Test': calculate_returns(test_df),
         'Val': calculate_returns(val_df),
         'Full': calculate_returns(full_df)
     }
-    
-    # Crear DataFrame de resultados
+
     summary_df = pd.DataFrame.from_dict(
         results, 
         orient='index', 
         columns=['Monthly %', 'Quarterly %', 'Yearly %']
-    )
-    
-    # Formatear
-    summary_df = summary_df.round(2)
-    
-    # Añadir símbolo de porcentaje para claridad (opcional)
-    # summary_df = summary_df.astype(str) + '%'
-    
+    ).round(2)
+
     return summary_df
 
 def plot_returns_summary_table(summary_df, title="Returns Summary"):
