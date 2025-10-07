@@ -39,22 +39,42 @@ def get_calmar(portfolio_df: pd.DataFrame) -> float:
     return calmar
 
 def get_sharpe_ratio(df, freq='Monthly', risk_free_rate=0):
-    """Calcula el Sharpe Ratio anualizado"""
-
+    """Calcula el Sharpe Ratio anualizado con manejo mejorado de datos insuficientes"""
     freq_map = {'Monthly': 'M', 'Quarterly': 'Q', 'Yearly': 'Y'}
     annualization_factors = {'Monthly': np.sqrt(12), 'Quarterly': np.sqrt(4), 'Yearly': 1.0}
     
     if freq not in freq_map:
         return np.nan
     
+    # Calcular duración del dataset en años
+    tiempo_total = df['Date'].iloc[-1] - df['Date'].iloc[0]
+    años = tiempo_total.total_seconds() / (365.25 * 24 * 3600)
+    
+    # Si el periodo es muy corto para la frecuencia solicitada, advertir
+    min_periods = {'Monthly': 3, 'Quarterly': 2, 'Yearly': 2}
+    
     ret = df.set_index('Date')['portfolio_value'].resample(freq_map[freq]).last().pct_change().dropna()
     
-    if len(ret) < 2 or np.std(ret) == 0:
+    if len(ret) < min_periods[freq]:
+        # No hay suficientes datos para esta frecuencia
+        # Opción 1: retornar np.nan (actual)
+        # Opción 2: calcular usando frecuencia más corta y anualizar
+        if freq == 'Yearly' and años < 2:
+            # Usar retornos mensuales pero reportar como yearly
+            ret_monthly = df.set_index('Date')['portfolio_value'].resample('M').last().pct_change().dropna()
+            if len(ret_monthly) < 2:
+                return np.nan
+            rf_adjusted = risk_free_rate / 12
+            excess_return = ret_monthly - rf_adjusted
+            sharpe = np.mean(excess_return) / np.std(ret_monthly) * np.sqrt(12)
+            return sharpe
+        return np.nan
+    
+    if np.std(ret) == 0:
         return np.nan
     
     periods_per_year = {'Monthly': 12, 'Quarterly': 4, 'Yearly': 1}
     rf_adjusted = risk_free_rate / periods_per_year[freq]
-    
     excess_return = ret - rf_adjusted
     sharpe = np.mean(excess_return) / np.std(ret) * annualization_factors[freq]
     
@@ -62,18 +82,30 @@ def get_sharpe_ratio(df, freq='Monthly', risk_free_rate=0):
 
 
 def get_sortino_ratio(df, freq='Monthly', risk_free_rate=0, target_return=0):
-    """Calcula el Sortino Ratio anualizado"""
-
+    """Calcula el Sortino Ratio anualizado con manejo mejorado de datos insuficientes"""
     freq_map = {'Monthly': 'M', 'Quarterly': 'Q', 'Yearly': 'Y'}
     annualization_factors = {'Monthly': np.sqrt(12), 'Quarterly': np.sqrt(4), 'Yearly': 1.0}
     
     if freq not in freq_map:
         return np.nan
     
+    tiempo_total = df['Date'].iloc[-1] - df['Date'].iloc[0]
+    años = tiempo_total.total_seconds() / (365.25 * 24 * 3600)
+    
     ret = df.set_index('Date')['portfolio_value'].resample(freq_map[freq]).last().pct_change().dropna()
     
     if len(ret) < 2:
-        return np.nan
+        # Fallback a frecuencia mensual para yearly si no hay suficientes datos
+        if freq == 'Yearly' and años < 2:
+            ret = df.set_index('Date')['portfolio_value'].resample('M').last().pct_change().dropna()
+            if len(ret) < 2:
+                return np.nan
+            annualization_factors = {'Yearly': np.sqrt(12)}  # Usar factor mensual
+            periods_per_year = 12
+        else:
+            return np.nan
+    else:
+        periods_per_year = {'Monthly': 12, 'Quarterly': 4, 'Yearly': 1}[freq]
     
     downside_returns = ret[ret < target_return] - target_return
     
@@ -85,9 +117,7 @@ def get_sortino_ratio(df, freq='Monthly', risk_free_rate=0, target_return=0):
     if downside_std == 0:
         return np.nan
     
-    periods_per_year = {'Monthly': 12, 'Quarterly': 4, 'Yearly': 1}
-    rf_adjusted = risk_free_rate / periods_per_year[freq]
-    
+    rf_adjusted = risk_free_rate / periods_per_year
     excess_return = np.mean(ret) - rf_adjusted
     sortino = excess_return / downside_std * annualization_factors[freq]
     
