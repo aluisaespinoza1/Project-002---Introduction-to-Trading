@@ -4,15 +4,15 @@
 
 To run the code first:
 
- 1.  Create virtual environment
+ 1.  Create virtual environment: 
 python -m venv venv
 
  2. Activate venv  
  - MacOs: source venv/bin/activate
  - Windows: venv\Scripts\activate
 
- 3. Install Requirements
+ 3. Install Requirements: 
  pip install -r requirements.txt
 
- 4. Run code on your terminal
+ 4. Run code on your terminal: 
  python main.py
