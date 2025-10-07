@@ -34,7 +34,7 @@ def optimize(trial, train_data):
         # MACD - rangos estándar de la industria
         "macd_fast": trial.suggest_int("macd_fast", 8, 15),
         "macd_slow": trial.suggest_int("macd_slow", 20, 30),
-        "macd_signal": trial.suggest_int("macd_signal", 7, 12),
+        "macd_signal": trial.suggest_int("macd_signal", 5, 12),
         
         # Stochastic - ventanas más cortas para crypto
         "stoch_window": trial.suggest_int("stoch_window", 10, 21),

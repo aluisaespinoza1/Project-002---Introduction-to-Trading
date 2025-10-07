@@ -38,7 +38,7 @@ def get_calmar(portfolio_df: pd.DataFrame) -> float:
     
     return calmar
 
-def get_sharpe_ratio(df, freq='Monthly', risk_free_rate=0):
+def get_sharpe_ratio(df, freq='Monthly', risk_free_rate=0.0413):
     """Calcula el Sharpe Ratio anualizado con manejo mejorado de datos insuficientes"""
     freq_map = {'Monthly': 'M', 'Quarterly': 'Q', 'Yearly': 'Y'}
     annualization_factors = {'Monthly': np.sqrt(12), 'Quarterly': np.sqrt(4), 'Yearly': 1.0}
@@ -81,7 +81,7 @@ def get_sharpe_ratio(df, freq='Monthly', risk_free_rate=0):
     return sharpe
 
 
-def get_sortino_ratio(df, freq='Monthly', risk_free_rate=0, target_return=0):
+def get_sortino_ratio(df, freq='Monthly', risk_free_rate=0.0413, target_return=0):
     """Calcula el Sortino Ratio anualizado con manejo mejorado de datos insuficientes"""
     freq_map = {'Monthly': 'M', 'Quarterly': 'Q', 'Yearly': 'Y'}
     annualization_factors = {'Monthly': np.sqrt(12), 'Quarterly': np.sqrt(4), 'Yearly': 1.0}
