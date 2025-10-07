@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from signals import get_signals
 from backtest import backtest
+import dateparser as dt
 from metrics import get_sharpe_ratio, get_sortino_ratio, get_max_drawdown, get_win_rate, get_calmar
 
 
@@ -22,8 +23,12 @@ def split_data(df):
     test_size = int(n * 0.2)
     val_size = n - train_size - test_size  # para cubrir el resto
     
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce') 
-    df = df.sort_values("Date").reset_index(drop=True)
+    #df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    #df = df.sort_values("Date").reset_index(drop=True)
+
+    # Parseo de fechas con dateparser para manejar errores y sort por fecha
+    df['Date'] = df['Date'].apply(lambda x: dt.parse(str(x))) 
+    df = df.sort_values(by='Date', ascending=True, ignore_index=True)
 
     train = df.iloc[:train_size]
     test  = df.iloc[train_size:train_size + test_size]
@@ -35,23 +40,29 @@ def split_data(df):
     
     return train, test, val
 
-def evaluate_best_params(train_df, test_df, val_df, best_params):
+def evaluate_best_params(train_df, test_df, val_df, full_df, best_params):
     """
-    Usa best_params para correr el backtest en train, test y val,
+    Usa best_params para correr el backtest en train, test, val y full,
     y calcula métricas (monthly, quarterly, yearly).
     
     Parámetros:
-        train_df, test_df, val_df: DataFrames con datos
+        train_df, test_df, val_df, full_df: DataFrames con datos
         best_params: dict con parámetros óptimos
-        backtest_fn: función de backtest
-        get_signals_fn: función para generar señales
     
     Retorna:
-        portfolios_dict: { 'train': df, 'test': df, 'val': df }
-        metrics_dict: { 'train': df_métricas, 'test': df_métricas, 'val': df_métricas }
+        portfolios_dict: { 'train': df, 'test': df, 'val': df, 'full': df }
+        metrics_dict: { 'train': df_métricas, 'test': df_métricas,
+                        'val': df_métricas, 'full': df_métricas }
     """
     
-    datasets = {'train': train_df, 'test': test_df, 'val': val_df}
+    # 🔹 Added full dataset here
+    datasets = {
+        'train': train_df,
+        'test': test_df,
+        'val': val_df,
+        'full': full_df
+    }
+    
     portfolios_dict = {}
     metrics_dict = {}
     
@@ -59,7 +70,6 @@ def evaluate_best_params(train_df, test_df, val_df, best_params):
     
     for name, df in datasets.items():
         # Generar señales
-        #df_signals = get_signals(df.copy(), **best_params)
         df_signals, _ = get_signals(df.copy(), **best_params)
         
         # Correr backtest
@@ -407,6 +417,175 @@ def plot_metrics_summary_table(metrics_dict, frequency='Monthly'):
         ),
         height=400,
         margin=dict(l=20, r=20, t=80, b=20)
+    )
+    
+    return fig
+
+def calculate_returns_summary(train_df, test_df, val_df, full_df):
+    """
+    Calcula rendimientos ANUALIZADOS promedio para diferentes periodos de resampling.
+    
+    Parameters
+    ----------
+    train_df, test_df, val_df, full_df : pandas.DataFrame
+        Dataframes que deben contener las columnas 'Date' y 'portfolio_value'
+    
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame con rendimientos anualizados para cada frecuencia de medición
+    """
+    
+    def calculate_returns(df):
+        """Función auxiliar para calcular rendimientos anualizados por periodo"""
+        df = df.copy()
+        
+        # Asegurar que Date es datetime
+        if not pd.api.types.is_datetime64_any_dtype(df['Date']):
+            df['Date'] = pd.to_datetime(df['Date'])
+        
+        df = df.sort_values('Date').reset_index(drop=True)
+        df_indexed = df.set_index('Date')
+        
+        # Calcular duración total del periodo en años
+        tiempo_total = df['Date'].iloc[-1] - df['Date'].iloc[0]
+        años_totales = tiempo_total.total_seconds() / (365.25 * 24 * 3600)
+        
+        # Método 1: Rendimiento compuesto anualizado (CAGR) - Más preciso
+        valor_inicial = df['portfolio_value'].iloc[0]
+        valor_final = df['portfolio_value'].iloc[-1]
+        
+        if años_totales > 0 and valor_inicial > 0:
+            cagr = (valor_final / valor_inicial) ** (1 / años_totales) - 1
+        else:
+            cagr = 0
+        
+        # Método 2: Rendimientos promedio por periodo (con anualización)
+        # MENSUAL: resample a fin de mes, calcular retornos, anualizar
+        monthly_returns = df_indexed['portfolio_value'].resample('M').last().pct_change().dropna()
+        if len(monthly_returns) >= 2:
+            # Promedio geométrico anualizado
+            monthly_avg = ((1 + monthly_returns.mean()) ** 12 - 1)
+        else:
+            monthly_avg = cagr  # Fallback al CAGR si no hay suficientes datos
+        
+        # TRIMESTRAL: resample a fin de trimestre, calcular retornos, anualizar
+        quarterly_returns = df_indexed['portfolio_value'].resample('Q').last().pct_change().dropna()
+        if len(quarterly_returns) >= 2:
+            quarterly_avg = ((1 + quarterly_returns.mean()) ** 4 - 1)
+        else:
+            quarterly_avg = cagr
+        
+        # ANUAL: usar directamente el CAGR calculado
+        yearly_avg = cagr
+        
+        # Convertir a porcentaje
+        return monthly_avg * 100, quarterly_avg * 100, yearly_avg * 100
+    
+    # Calcular para cada dataframe
+    results = {
+        'Train': calculate_returns(train_df),
+        'Test': calculate_returns(test_df),
+        'Val': calculate_returns(val_df),
+        'Full': calculate_returns(full_df)
+    }
+    
+    # Crear DataFrame de resultados
+    summary_df = pd.DataFrame.from_dict(
+        results, 
+        orient='index', 
+        columns=['Monthly %', 'Quarterly %', 'Yearly %']
+    )
+    
+    # Formatear
+    summary_df = summary_df.round(2)
+    
+    # Añadir símbolo de porcentaje para claridad (opcional)
+    # summary_df = summary_df.astype(str) + '%'
+    
+    return summary_df
+
+def plot_returns_summary_table(summary_df, title="Returns Summary"):
+    """
+    Crea una tabla visual de Plotly para el resumen de rendimientos.
+    
+    Parameters
+    ----------
+    summary_df : pandas.DataFrame
+        DataFrame con rendimientos (output de calculate_returns_summary)
+    title : str
+        Título de la tabla
+    
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
+    import plotly.graph_objects as go
+    
+    # Preparar datos para la tabla
+    datasets = summary_df.index.tolist()
+    columns = summary_df.columns.tolist()
+    
+    # Crear valores formateados con colores condicionales
+    cell_colors = []
+    cell_values = []
+    
+    # Header values
+    header_values = ['Dataset'] + columns
+    
+    # Preparar cada columna
+    for col in ['Dataset'] + columns:
+        if col == 'Dataset':
+            cell_values.append(datasets)
+            cell_colors.append(['#f8f9fa'] * len(datasets))
+        else:
+            values = summary_df[col].values
+            # Formatear como porcentaje con 2 decimales
+            formatted = [f'{v:.2f}%' for v in values]
+            cell_values.append(formatted)
+            
+            # Colores condicionales: verde si positivo, rojo si negativo
+            colors = []
+            for v in values:
+                if v > 1.0:  # Verde fuerte para >1%
+                    colors.append('#d4edda')
+                elif v > 0:  # Verde claro para positivo
+                    colors.append('#e8f5e9')
+                elif v > -1.0:  # Rojo claro para ligeramente negativo
+                    colors.append('#fff3cd')
+                else:  # Rojo fuerte para <-1%
+                    colors.append('#f8d7da')
+            cell_colors.append(colors)
+    
+    fig = go.Figure(data=[go.Table(
+        header=dict(
+            values=header_values,
+            fill_color='#2c3e50',
+            font=dict(color='white', size=14, family='Arial Black'),
+            align='center',
+            height=40
+        ),
+        cells=dict(
+            values=cell_values,
+            fill_color=cell_colors,
+            font=dict(size=13, family='Arial'),
+            align=['left'] + ['center'] * len(columns),
+            height=35,
+            line_color='#dee2e6',
+            line_width=1
+        )
+    )])
+    
+    fig.update_layout(
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor='center',
+            font=dict(size=18, color='#2c3e50', family='Arial Black')
+        ),
+        height=300,
+        margin=dict(l=20, r=20, t=80, b=20),
+        paper_bgcolor='white'
     )
     
     return fig
