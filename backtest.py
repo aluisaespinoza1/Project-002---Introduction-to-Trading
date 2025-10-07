@@ -68,8 +68,13 @@ def backtest(data, **params):
                 active_long.remove(pos)
         
         for pos in active_short.copy():
-            if (pos.stop_loss < row.Close) or (pos.take_profit > row.Close):
-                cash += (pos.price * pos.n_shares) + (pos.price - row.Close) * n_shares * (1 - com)
+            # Stop-loss: precio actual supera precio de stop (perdemos)
+            # Take-profit: precio actual está bajo precio target (ganamos)
+            if (row.Close >= pos.stop_loss) or (row.Close <= pos.take_profit):
+                # Profit/Loss = (Precio de entrada - Precio de salida) * n_shares
+                pnl = (pos.price - row.Close) * pos.n_shares
+                # Devolvemos el colateral inicial más/menos el P&L, menos comisión
+                cash += (pos.price * pos.n_shares) + pnl * (1 - com)
                 active_short.remove(pos)
         
         # --- PORTFOLIO VALUE ---
